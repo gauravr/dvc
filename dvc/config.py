@@ -177,6 +177,13 @@ class Config(object):  # pylint: disable=too-many-instance-attributes
     SECTION_GDRIVE_CLIENT_ID = "gdrive_client_id"
     SECTION_GDRIVE_CLIENT_SECRET = "gdrive_client_secret"
     SECTION_GDRIVE_USER_CREDENTIALS_FILE = "gdrive_user_credentials_file"
+    SECTION_GDRIVE_SERVICE_ACCOUNT_EMAIL = "gdrive_service_account_email"
+    SECTION_GDRIVE_SERVICE_ACCOUNT_USER_EMAIL = (
+        "gdrive_service_account_user_email"
+    )
+    SECTION_GDRIVE_SERVICE_ACCOUNT_P12_FILE_PATH = (
+        "gdrive_service_account_p12_file_path"
+    )
 
     SECTION_REMOTE_CHECKSUM_JOBS = "checksum_jobs"
     SECTION_REMOTE_REGEX = r'^\s*remote\s*"(?P<name>.*)"\s*$'
@@ -223,6 +230,9 @@ class Config(object):  # pylint: disable=too-many-instance-attributes
         SECTION_GDRIVE_CLIENT_ID: str,
         SECTION_GDRIVE_CLIENT_SECRET: str,
         SECTION_GDRIVE_USER_CREDENTIALS_FILE: str,
+        SECTION_GDRIVE_SERVICE_ACCOUNT_EMAIL: str,
+        SECTION_GDRIVE_SERVICE_ACCOUNT_USER_EMAIL: str,
+        SECTION_GDRIVE_SERVICE_ACCOUNT_P12_FILE_PATH: str,
         PRIVATE_CWD: str,
         SECTION_REMOTE_NO_TRAVERSE: Bool,
         SECTION_REMOTE_VERIFY: Bool,
