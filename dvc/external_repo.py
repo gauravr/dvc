@@ -7,13 +7,15 @@ import threading
 
 from funcy import retry, suppress, wrap_with, cached_property
 
+from dvc.path_info import PathInfo
 from dvc.compat import fspath
 from dvc.repo import Repo
 from dvc.config import NoRemoteError, NotDvcRepoError
 from dvc.exceptions import NoRemoteInExternalRepoError
 from dvc.exceptions import OutputNotFoundError, NoOutputInExternalRepoError
 from dvc.exceptions import FileMissingError, PathMissingError
-from dvc.utils.fs import remove, fs_copy
+from dvc.utils.fs import remove, fs_copy, move
+from dvc.utils import tmp_fname
 from dvc.scm.git import Git
 
 
@@ -67,32 +69,48 @@ class ExternalRepo(Repo):
         self._set_upstream()
 
     def pull_to(self, path, to_info):
-        try:
-            out = None
-            with suppress(OutputNotFoundError):
-                out = self.find_out_by_relpath(path)
+        """
+        Pull the corresponding file or directory specified by `path` and
+        checkout it into `to_info`.
 
+        It works with files tracked by Git and DVC, and also local files
+        outside the repository.
+        """
+        out = None
+        path_info = PathInfo(self.root_dir) / path
+
+        with suppress(OutputNotFoundError):
+            (out,) = self.find_outs_by_path(fspath(path_info), strict=False)
+
+        try:
             if out and out.use_cache:
-                self._pull_cached(out, to_info)
+                self._pull_cached(out, path_info, to_info)
                 return
 
-            # Git handled files can't have absolute path
+            # Check if it is handled by Git (it can't have an absolute path)
             if os.path.isabs(path):
                 raise FileNotFoundError
 
-            fs_copy(os.path.join(self.root_dir, path), fspath(to_info))
+            fs_copy(fspath(path_info), fspath(to_info))
         except FileNotFoundError:
             raise PathMissingError(path, self.url)
 
-    def _pull_cached(self, out, to_info):
+    def _pull_cached(self, out, path_info, dest):
         with self.state:
-            # Only pull unless all needed cache is present
-            if out.changed_cache():
-                self.cloud.pull(out.get_used_cache())
+            tmp = PathInfo(tmp_fname(dest))
+            src = tmp / path_info.relative_to(out.path_info)
 
-            out.path_info = to_info
-            failed = out.checkout()
-            # This might happen when pull haven't really pulled all the files
+            out.path_info = tmp
+
+            # Only pull unless all needed cache is present
+            if out.changed_cache(filter_info=src):
+                self.cloud.pull(out.get_used_cache(filter_info=src))
+
+            failed = out.checkout(filter_info=src)
+
+            move(src, dest)
+            remove(tmp)
+
             if failed:
                 raise FileNotFoundError
 
@@ -200,7 +218,7 @@ def _clone_default_branch(url, rev):
         if clone_path:
             git = Git(clone_path)
             # Do not pull for known shas, branches and tags might move
-            if not Git.is_sha(rev) or not git.is_known(rev):
+            if not Git.is_sha(rev) or not git.has_rev(rev):
                 git.pull()
         else:
             clone_path = tempfile.mkdtemp("dvc-clone")
